@@ -13,8 +13,12 @@ import {
   signInWithEmailAndPassword,
   onAuthStateChanged,
   UserCredential,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  getReactNativePersistence,
+  UserInfo,
 } from 'firebase/auth';
+
+import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 
 // import stuff for firestore (database)
 import { 
@@ -42,7 +46,12 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 // initialize auth
-const auth = getAuth(app);
+// our authentication credentials at this point are saved on volatile memory (RAM)
+// it means that if the app's memory is dumped we will lose our credentials
+// const auth = getAuth(app);
+
+// how to save credentials on persistent storage
+const auth = initializeAuth(app, {persistence: getReactNativePersistence(ReactNativeAsyncStorage)});
 
 // initialize firestore
 const db = getFirestore(app);
@@ -51,6 +60,35 @@ export default function App() {
 
   const[email, setEmail] = useState("");
   const[password, setPassword] = useState("");
+
+  useEffect(() => {
+    
+    // listen for user status change
+    onAuthStateChanged(
+      auth, 
+      user => {
+        if(user) {
+          alert("USER IS AUTHENTICATED: " + user.email);
+        } else {
+          alert("SIGNED OUT :(");
+        }
+      }
+    );
+
+    // listen for collection data change 
+    onSnapshot(
+      collection(db, "perritos"),
+      querySnapshot => {
+        console.log("******************************************* SNAPSHOT CHANGE");
+        querySnapshot.forEach(
+          currentDocument => {
+            console.log(currentDocument.data());
+          }
+        );
+      }
+    );
+
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -103,7 +141,12 @@ export default function App() {
       />
       <Button 
         title='Reset password'
-        onPress={() => {}}
+        onPress={() => {
+          sendPasswordResetEmail(auth, email)
+          .then(() => {
+            alert("RESET EMAIL HAS BEEN SENT");
+          });
+        }}
       />
       <Button 
         title='Add dog'
